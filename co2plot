@@ -1,0 +1,61 @@
+#!/usr/bin/env python3
+import subprocess
+import datetime
+import matplotlib.dates as mdate
+import matplotlib.pyplot as plt
+
+IP = '192.168.xx.xx'
+PORT = 'xxxx'
+PATH = '$HOME/co2/current.txt'
+COMMAND = 'ssh -p {} pi@{} \'cat {}\''.format(PORT, IP, PATH)
+
+OFFSET = 50
+
+def parse_log(log):
+	log = log.split(' ')
+	return {'time': datetime.datetime.strptime(log[0], '%Y-%m-%d_%H:%M:%S'), 'co2': int(log[1])}
+
+def convert_to_list(data):
+	x = []
+	y = []
+	for log in data:
+		x.append(log.get('time', None))
+		y.append(log.get('co2', None))
+	return {'x': x,'y': y}
+
+def get_min_max(data):
+	min, max = 1<<16, 0
+	for log in data:
+		co2 = log.get('co2', None)
+		if co2 is None:
+			continue
+		if co2 < min:
+			min = co2
+		if co2 > max:
+			max = co2
+	return min, max
+
+def main():
+	current = subprocess.getoutput(COMMAND).split('\n')
+	data = []
+	for line in current:
+		if line == '':
+			continue
+		data.append(parse_log(line))
+	listdata = convert_to_list(data)
+	min, max = get_min_max(data)
+	xleft = data[0]['time']
+	xright = data[-1]['time']
+	plt.figure(figsize=(10,6),facecolor='w')
+	plt.rcParams['font.size']=12
+	plt.xlim([xleft,xright])
+	plt.ylim([min-OFFSET, max+OFFSET])
+	plt.xlabel('time')
+	plt.ylabel('CO2 concentration(ppm)')
+	plt.grid(which='major', axis='both', color='#999999', linestyle='--')
+
+	plt.plot(listdata['x'], listdata['y'])
+	plt.show()
+
+if __name__ == '__main__':
+	main()
